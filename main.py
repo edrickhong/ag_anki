@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import ast
 import random
 import genanki as gk
 import code
@@ -158,17 +159,50 @@ def gen_final_csv():
 
 def get_final_df(file_path):
     df = pd.read_csv(file_path)
-    df["Gloss"] = df["Gloss"].astype(str).str.replace(",",";")
+    df["Latin"] = df["Latin"].astype(str).str.replace(",",";")
+    df["Chapters"] = df["Chapters"].map(lambda x : ast.literal_eval(x))
     return df
+
+
+def get_subdeck_chapter(df,model,title,start, end):
+    deck = gk.Deck(random.randint(0,999999999),title)
+
+    for i,r in df.iterrows():
+        greek = r["Greek"]
+        parsed = r["Parsed"]
+        latin = r["Latin"]
+        chapters = r["Chapters"]
+
+        to_add = False
+
+        for c in chapters:
+            if c >=start and c <= end:
+                to_add = True
+                break
+
+        if to_add == True:
+            note = gk.Note(model= model, fields = [greek, latin])
+            deck.add_note(note)
+
+    return deck
 
 def main():
 
-    gen_final_csv()
-    return 
+    #gen_final_csv()
+    #return 
 
-    df = get_final_df("")
+    df = get_final_df("data/AG_Final_2025_04_17.csv")
 
-    #TODO: make the cards
+    model = gk.Model(random.randint(0,99999999),"AG",fields=[{"name" : "Greek"}, {"name" : "Translation"}], templates=[{"name" : "Card 1", "qfmt" : "{{Greek}}", "afmt" : '{{FrontSide}}<hr id="answer">{{Translation}}'}])
+
+    decks = []
+
+    decks.append(get_subdeck_chapter(df,model,"Athenaze::I-X",1,10))
+
+
+    gk.Package(decks).write_to_file("data/Athenaze.apkg")
+
+
 
 
 if __name__ == "__main__":
