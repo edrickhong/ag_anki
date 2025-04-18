@@ -7,105 +7,59 @@ from openai import OpenAI as ai
 from data.apikey import API_KEY
 from datetime import datetime as dt
 
-def deepseek_gloss(words, batch_size = 40):
-    cl = ai(api_key=API_KEY, base_url="https://api.deepseek.com")
-    latin = []
 
-    for i in range(0, len(words), batch_size):
-        print("\r{}/{} items done...".format(i,len(words)),end="",flush=True)
-        start = i
-        end = i + batch_size if (i + batch_size) < len(words) else len(words)
-        messages = [{"role" : "user", "content" : "I am going to give you a list of ancient greek words. I want you to return that word translated into latin with the long vowels marked by macrons. If a tense doesn't exist, say the aorist, use the closest equivalent in latin and mark it as such, for example (aorist, middle, etc). Greek loan words into latin should never be used unless a native latin equivalent doesn't exist. The words should be separated by a semi-colon. do not include any other information than what is asked. This list will be parsed programatically. Thanks:\n {}".format(words.iloc[start:end])}]
+#cl = ai(api_key=API_KEY, base_url="https://api.deepseek.com")
+cl = ai(api_key=API_KEY)
 
-        response = cl.chat.completions.create(model="deepseek-chat", messages=messages)
-        latin += response.choices[0].message.content.split(';')
+def to_batch_string(words):
+    out = ""
 
-    #code.interact(local=locals())
-    return pd.Series(latin).astype(str).str.strip()
+    for i,w in enumerate(words):
+        out += str(w).strip(";")
 
-def deepseek_verb_conjugate(words, batch_size = 5):
-    cl = ai(api_key=API_KEY, base_url="https://api.deepseek.com")
-    verb = []
+        if i != len(words) - 1:
+            out += ";"
 
-    for i in range(0, len(words), batch_size):
-        print("\r{}/{} items done...".format(i,len(words)),end="",flush=True)
-        start = i
-        end = i + batch_size if (i + batch_size) < len(words) else len(words)
-        messages = [{"role" : "user", "content" : "I am going to give you a list of ancient greek verbs. For each word in the list, randomly choose either a conjugation or participle and write that in a list. Each entry should only contain the conjugated verb or participle. Each list entry is separated by a ; . There must at least be one participle. The response will be parsed, so do not add anything else. Limit the conjugations to the following: {} The verbs are: {}".format("present indicative active and middle voice, the active present infinitive and the participles", words.iloc[start:end])}]
 
-        response = cl.chat.completions.create(model="deepseek-chat", messages=messages)
-        v = response.choices[0].message.content
+    return out
 
-        verb += v.split(";")
+def deepseek_prompt(prompt, words, batch_size = 20):
+    out = []
+    i = 0
+    attempts = 0
 
-        if len(v.split(";")) > batch_size:
+    #for i in range(0, len(words), batch_size):
+    while i < len(words):
+
+
+        if attempts == 5:
+            print("\nbatch size {}\tn size {}\t message {}".format(batch_size,len(n),m))
             code.interact(local=locals())
 
-        #code.interact(local=locals())
-
-    #code.interact(local=locals())
-    return pd.Series(verb).astype(str).str.strip()
-
-
-def deepseek_verb_parse(words, batch_size = 5):
-    cl = ai(api_key=API_KEY, base_url="https://api.deepseek.com")
-    conj = []
-
-    for i in range(0, len(words), batch_size):
-        print("\r{}/{} items done...".format(i,len(words)),end="",flush=True)
+        print("\r{}/{} items {} done...".format(i,len(words),"" if attempts == 0 else "(" + str(attempts) + ")"),flush=True)
         start = i
         end = i + batch_size if (i + batch_size) < len(words) else len(words)
+        w = list(words.iloc[start:end])
+        messages = [{"role" : "user", "content" : "Note the entries in the list I gave you is ; separated\n" + prompt.format(to_batch_string(w)) + "\n Do not terminate with a ;. Each entry in the list I gave you MUST ONLY have one corresponding entry in your response list, EVEN IF that entry contains multiple words"}]
 
-        messages = [{"role" : "user", "content" : "I am going to give you a list of ancient greek verbs. Parse each verb, listing the person, number, tense, etc. Do not include the original verb. Each entry is separated by a ;  and nothing more. The response must be on a single line, no '\n' or numbering. The response will be parsed, so do not add anything else. The verbs are: {}".format(words)}]
+        #response = cl.chat.completions.create(model="deepseek-chat", messages=messages)
+        response = cl.chat.completions.create(model="gpt-4o", messages=messages)
+        m = response.choices[0].message.content
+        n = m.split(";")
 
-        response1 = cl.chat.completions.create(model="deepseek-chat", messages=messages)
-        c = response1.choices[0].message.content
 
-        conj += c.split(";")
+        if len(n) > batch_size:
+            attempts += 1
+            continue
 
-        #code.interact(local=locals())
+        out += n
+        i += batch_size
+        attempts = 0
 
-    #code.interact(local=locals())
-    return pd.Series(conj).astype(str).str.strip()
+    print("")
 
-def deepseek_noun_parse(words, batch_size = 5):
-    cl = ai(api_key=API_KEY, base_url="https://api.deepseek.com")
-    noun = []
+    return pd.Series(out).astype(str).str.strip()
 
-    for i in range(0, len(words), batch_size):
-        print("\r{}/{} items done...".format(i,len(words)),end="",flush=True)
-        start = i
-        end = i + batch_size if (i + batch_size) < len(words) else len(words)
-
-        messages = [{"role" : "user", "content" : "I am going to give you a list of ancient greek nouns. Parse each noun, listing the person, case etc. Do not include the original noun. Each entry is separated by a ;  and nothing more. The response must be on a single line, no '\n' or numbering. The response will be parsed, so do not add anything else. The verbs are: {}".format(words)}]
-
-        response1 = cl.chat.completions.create(model="deepseek-chat", messages=messages)
-        n = response1.choices[0].message.content
-
-        noun += n.split(";")
-
-        #code.interact(local=locals())
-
-    #code.interact(local=locals())
-    return pd.Series(noun).astype(str).str.strip()
-
-def deepseek_noun_decline(words, batch_size = 5):
-    cl = ai(api_key=API_KEY, base_url="https://api.deepseek.com")
-    noun = []
-
-    for i in range(0, len(words), batch_size):
-        print("\r{}/{} items done...".format(i,len(words)),end="",flush=True)
-        start = i
-        end = i + batch_size if (i + batch_size) < len(words) else len(words)
-        messages = [{"role" : "user", "content" : "I am going to give you a list of ancient greek nouns. For each word in the list, decline it for a random case and number and write the declined noun in a list. Each entry should only contain the declined noun. Each list entry is separated by a ; and on a single line. This response will be parsed, so do not include extraneous details. The nouns are: {}".format(words.iloc[start:end])}]
-
-        response = cl.chat.completions.create(model="deepseek-chat", messages=messages)
-        n = response.choices[0].message.content
-
-        noun += n.split(";")
-
-    #code.interact(local=locals())
-    return pd.Series(noun).astype(str).str.strip()
 
 #does some formatting and translates Gloss to Latin
 def get_df():
@@ -143,6 +97,25 @@ def get_df():
     return df
 
 
+prompts = {
+        "gloss" : "I am going to give you a list of ancient greek words. I want you to return that word translated into latin with the long vowels marked by macrons. If a tense doesn't exist, say the aorist, use the closest equivalent in latin and mark it as such, for example (aorist, middle, etc). Greek loan words into latin should never be used unless a native latin equivalent doesn't exist. Your output for each word is considered an entry. The entries should be separated by a semi-colon. do not include any other information than what is asked. This list will be parsed programatically. Thanks:\n {}",
+
+
+        "conjugate" : "I am going to give you a list of ancient greek verbs. For each word in the list, randomly choose either a conjugation or participle and write that in a list, which we call an entry. Each entry should only contain the conjugated verb or participle. Each list entry is separated by a ; . There must at least be one participle. The response will be parsed, so do not add anything else. Limit the conjugations to the following: present indicative active and middle voice, the active present infinitive and the participles. The verbs are: {}",
+
+
+        "decline" : "I am going to give you a list of ancient greek nouns. For each word in the list, decline it for a random case and number and write the declined noun in a list, for which each of your responses is called an entry. Each entry should only contain the declined noun. Each list entry is separated by a ; and all of them are on the same line. This response will be parsed, so do not include extraneous details. The nouns are: {}",
+
+
+        "verb-parse" : "I am going to give you a list of ancient greek verbs. Parse each verb, listing the person, number, tense, etc. All of these items are considered 1 entry, separated by a comma. Do not include the original verb. Each entry is separated by a ;  and nothing more. The response will be parsed, so do not add anything else. The verbs are: {}",
+
+
+        "noun-parse" : "I am going to give you a list of ancient greek nouns. Parse each noun, listing the person, case etc. All of these items are considered one entry and are comma separated.Do not include the original noun. Each entry is separated by a ;  and nothing more. The response will be parsed, so do not add anything else. The verbs are: {}",
+
+
+        }
+
+
 def gen_final_csv():
     df = get_df()
     
@@ -151,17 +124,22 @@ def gen_final_csv():
     others = df[~(df["Part of Speech"] == "nōmen" ) & ~(df["Part of Speech"] == "vērbum")]
 
 
+
     verbs_sample = verbs.sample(n=20,random_state=random.randint(0,19))
     nouns_sample = nouns.sample(n=20,random_state=random.randint(0,19))
 
-    v = deepseek_verb_conjugate(verbs_sample["Lexical Form"])
-    n = deepseek_noun_decline(nouns_sample["Lexical Form"])
+    print("Conjugating...")
+    v = deepseek_prompt(prompts["conjugate"],verbs_sample["Lexical Form"])
+    print("Declining...")
+    n = deepseek_prompt(prompts["decline"],nouns_sample["Lexical Form"])
 
     all_verbs = pd.concat([verbs["Lexical Form"],v], ignore_index=True)
     all_nouns = pd.concat([nouns["Lexical Form"],n], ignore_index=True)
 
-    parsed_v = deepseek_verb_parse(all_verbs)
-    parsed_n = deepseek_verb_parse(all_nouns)
+    print("Parsing verbs...")
+    parsed_v = deepseek_prompt(prompts["verb-parse"],all_verbs)
+    print("Parsing nouns...")
+    parsed_n = deepseek_prompt(prompts["noun-parse"],all_nouns)
     parsed_o = pd.Series([np.nan] * len(others))
 
     # Greek Type Chapter Parsed Latin
@@ -169,10 +147,13 @@ def gen_final_csv():
     chapters = pd.concat([others["Chapter(s)"],verbs["Chapter(s)"],verbs_sample["Chapter(s)"],nouns["Chapter(s)"],nouns_sample["Chapter(s)"]], ignore_index=True)
     types = pd.concat([others["Part of Speech"],verbs["Part of Speech"],verbs_sample["Part of Speech"],nouns["Part of Speech"],nouns_sample["Part of Speech"]], ignore_index=True)
     parsed = pd.concat([parsed_o,parsed_v,parsed_n],ignore_index=True)
-    latin = deepseek_gloss(greek)
+
+    latin = deepseek_prompt(prompts["gloss"],greek,40)
 
     out_df = pd.DataFrame({"Greek" : greek, "Parsed" : parsed, "Type" : types, "Latin" : latin, "Chapters" : chapters})
     out_df.to_csv("data/AG_Final_{}.csv".format(dt.now().strftime("%Y_%m_%d")),index=False)
+
+    #code.interact(local=locals())
     return 
 
 def get_final_df(file_path):
